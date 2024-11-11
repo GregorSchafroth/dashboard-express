@@ -1,5 +1,5 @@
 // src/utils/retry.ts
-import logger from "./logger";
+import logger from "./logger.js";
 
 export async function withRetry<T>(
   operation: () => Promise<T>,

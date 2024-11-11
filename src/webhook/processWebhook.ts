@@ -1,5 +1,5 @@
 // src/webhook/processWebhook.ts
-import { logger } from '../utils/logger.js'
+import logger from '../utils/logger.js'
 import prisma from '../lib/prisma.js'
 import { getTranscripts } from '../services/voiceflow.js'
 import {

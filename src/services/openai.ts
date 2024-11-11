@@ -1,6 +1,6 @@
 // src/services/openai.ts
 import OpenAI from 'openai';
-import { logger } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 import type { VoiceflowTurn, VoiceflowPayload } from '../types/voiceflow.js';
 
 const openai = new OpenAI({

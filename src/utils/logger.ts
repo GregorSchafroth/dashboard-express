@@ -1,5 +1,5 @@
 // src/utils/logger.ts
-export const logger = {
+const logger = {
   sectionStart: (section: string) => console.log(`\n=== Starting ${section} ===`),
   sectionEnd: (section: string, startTime: number) => 
     console.log(`=== ${section} completed in ${Date.now() - startTime}ms ===\n`),

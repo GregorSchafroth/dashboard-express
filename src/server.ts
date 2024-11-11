@@ -7,7 +7,7 @@ import express, {
 } from 'express'
 import dotenv from 'dotenv'
 import { processWebhook } from './webhook/processWebhook.js'
-import { logger } from './utils/logger.js'
+import logger from './utils/logger.js'
 import type { WebhookBody } from './types/voiceflow.js'
 
 // Load environment variables

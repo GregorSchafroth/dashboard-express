@@ -1,5 +1,5 @@
 // src/services/transcriptDetail.ts
-import { logger } from '../utils/logger.js';
+import logger from '../utils/logger.js';
 import { withRetry } from '../utils/retry.js';
 import prisma from '../lib/prisma.js';
 import type { Prisma } from '@prisma/client';
