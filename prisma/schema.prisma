@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  email     String   @unique
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  clerkId   String   @unique
+  id        Int      @id @default(autoincrement())
+  projectId Int?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+}
+
+model Project {
+  name                 String          @unique
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  voiceflowApiKey      String
+  voiceflowProjectId   String
+  id                   Int             @id @default(autoincrement())
+  lastTranscriptNumber Int             @default(0)
+  slug                 String          @unique
+  Job                  Job[]
+  knowledgeBases       KnowledgeBase[]
+  transcripts          Transcript[]
+  users                User[]
+}
+
+model Transcript {
+  id                    Int       @id @default(autoincrement())
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  name                  String?
+  image                 String?
+  reportTags            String[]  @default([])
+  language              String?
+  outcome               String?
+  messageCount          Int       @default(0)
+  bookmarked            Boolean   @default(false)
+  metadata              Json?
+  duration              Int?
+  firstResponse         DateTime?
+  lastResponse          DateTime?
+  rating                Int?
+  isComplete            Boolean   @default(false)
+  isArchived            Boolean   @default(false)
+  voiceflowTranscriptId String
+  projectId             Int
+  transcriptNumber      Int
+  topic                 String?
+  sessions              Session[]
+  project               Project   @relation(fields: [projectId], references: [id])
+  turns                 Turn[]
+
+  @@unique([projectId, voiceflowTranscriptId])
+  @@unique([projectId, transcriptNumber])
+  @@index([projectId, createdAt])
+  @@index([projectId])
+  @@index([bookmarked])
+}
+
+model Session {
+  id                 Int        @id @default(autoincrement())
+  voiceflowSessionId String
+  transcriptId       Int
+  browser            String
+  device             String
+  os                 String
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  transcript         Transcript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+
+  @@unique([transcriptId, voiceflowSessionId])
+  @@index([voiceflowSessionId])
+}
+
+model Turn {
+  id              Int        @id @default(autoincrement())
+  transcriptId    Int
+  type            String
+  payload         Json
+  startTime       DateTime
+  format          String
+  voiceflowTurnId String
+  transcript      Transcript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+
+  @@index([transcriptId])
+  @@index([voiceflowTurnId])
+}
+
+model KnowledgeBase {
+  id        Int              @id @default(autoincrement())
+  name      String
+  projectId Int
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  project   Project          @relation(fields: [projectId], references: [id])
+  entries   KnowledgeEntry[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+}
+
+model KnowledgeEntry {
+  id              Int           @id @default(autoincrement())
+  question        String
+  answer          String
+  tags            String[]      @default([])
+  knowledgeBaseId Int
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id])
+
+  @@index([knowledgeBaseId])
+}
+
+model Job {
+  id        String    @id
+  projectId Int
+  type      JobType
+  status    JobStatus
+  payload   Json
+  error     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime
+  Project   Project   @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@index([status])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum JobType {
+  TRANSCRIPT_PROCESSING
+}
