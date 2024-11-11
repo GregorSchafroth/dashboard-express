@@ -2,11 +2,13 @@
   "name": "express",
   "version": "1.0.0",
   "type": "module",
-  "main": "server.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "keywords": [],
   "author": "Gregor Schafroth",
@@ -20,7 +22,9 @@
     "node-fetch": "^3.3.2",
     "openai": "^4.71.1",
     "p-limit": "^6.1.0",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
