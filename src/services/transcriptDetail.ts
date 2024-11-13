@@ -124,6 +124,7 @@ export async function saveTranscriptTurns(
         isComplete: metrics.isComplete,
         language: analysis.language,
         topic: analysis.topic,
+        topicTranslations: analysis.topicTranslations,
         name: analysis.name,
       },
     });

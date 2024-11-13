@@ -114,6 +114,10 @@ async function processAndSaveTranscripts(
   const MIN_DELAY = 200
   const MAX_RETRIES = 3
 
+  // Initialize the progress bar with total number of transcripts
+  logger.startProgress(transcriptsWithNumbers.length);
+  let processedCount = 0;
+
   // Process transcripts in batches
   for (let i = 0; i < transcriptsWithNumbers.length; i += BATCH_SIZE) {
     const batch = transcriptsWithNumbers.slice(i, i + BATCH_SIZE)
@@ -185,6 +189,12 @@ async function processAndSaveTranscripts(
               duration: Date.now() - transcriptStart,
             })
 
+            processedCount++;
+            logger.updateProgress(
+              processedCount,
+              `Processing transcript ${transcript.assignedNumber}`
+            );
+
             const delay = MIN_DELAY + Math.random() * 300
             await new Promise((resolve) => setTimeout(resolve, delay))
 
@@ -206,7 +216,6 @@ async function processAndSaveTranscripts(
         }
       })
     )
-
     await Promise.allSettled(batchPromises)
   }
 

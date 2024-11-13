@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,12 +11,12 @@ datasource db {
 }
 
 model User {
+  id        Int      @id @default(autoincrement())
   email     String   @unique
   role      Role     @default(MEMBER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   clerkId   String   @unique
-  id        Int      @id @default(autoincrement())
   projectId Int?
   project   Project? @relation(fields: [projectId], references: [id])
 
@@ -22,18 +24,17 @@ model User {
 }
 
 model Project {
+  id                   Int             @id @default(autoincrement())
   name                 String          @unique
+  slug                 String          @unique
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   voiceflowApiKey      String
   voiceflowProjectId   String
-  id                   Int             @id @default(autoincrement())
   lastTranscriptNumber Int             @default(0)
-  slug                 String          @unique
-  Job                  Job[]
-  knowledgeBases       KnowledgeBase[]
   transcripts          Transcript[]
   users                User[]
+  knowledgeBases       KnowledgeBase[]
 }
 
 model Transcript {
@@ -45,6 +46,8 @@ model Transcript {
   reportTags            String[]  @default([])
   language              String?
   outcome               String?
+  topic                 String?
+  topicTranslations     Json?  // NEWLY ADDED
   messageCount          Int       @default(0)
   bookmarked            Boolean   @default(false)
   metadata              Json?
@@ -57,7 +60,6 @@ model Transcript {
   voiceflowTranscriptId String
   projectId             Int
   transcriptNumber      Int
-  topic                 String?
   sessions              Session[]
   project               Project   @relation(fields: [projectId], references: [id])
   turns                 Turn[]
@@ -98,14 +100,19 @@ model Turn {
   @@index([voiceflowTurnId])
 }
 
+enum Role {
+  ADMIN
+  MEMBER
+}
+
 model KnowledgeBase {
   id        Int              @id @default(autoincrement())
-  name      String
+  name      String // e.g., "FAQs"
   projectId Int
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
   project   Project          @relation(fields: [projectId], references: [id])
   entries   KnowledgeEntry[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   @@unique([projectId, name])
   @@index([projectId])
@@ -114,43 +121,12 @@ model KnowledgeBase {
 model KnowledgeEntry {
   id              Int           @id @default(autoincrement())
   question        String
-  answer          String
+  answer          String        @db.Text
   tags            String[]      @default([])
   knowledgeBaseId Int
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id])
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id])
 
   @@index([knowledgeBaseId])
-}
-
-model Job {
-  id        String    @id
-  projectId Int
-  type      JobType
-  status    JobStatus
-  payload   Json
-  error     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime
-  Project   Project   @relation(fields: [projectId], references: [id])
-
-  @@index([projectId])
-  @@index([status])
-}
-
-enum Role {
-  ADMIN
-  MEMBER
-}
-
-enum JobStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-}
-
-enum JobType {
-  TRANSCRIPT_PROCESSING
 }
