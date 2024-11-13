@@ -20,7 +20,7 @@ export async function getTranscripts(
 
   // Get dates for the range (since yesterday '-1'/ 1 week ago '-7')
   const startDate = new Date()
-  startDate.setDate(startDate.getDate() - 7)
+  startDate.setDate(startDate.getDate() - 2)
   startDate.setHours(0, 0, 0, 0)
 
   const endDate = new Date()
@@ -31,10 +31,10 @@ export async function getTranscripts(
     return date.toISOString().split('T')[0]
   }
 
-  const url = `https://api.voiceflow.com/v2/transcripts/${voiceflowProjectId}`
-  // const url = `https://api.voiceflow.com/v2/transcripts/${voiceflowProjectId}?startDate=${formatDate(
-  //   startDate
-  // )}&endDate=${formatDate(endDate)}`
+  // const url = `https://api.voiceflow.com/v2/transcripts/${voiceflowProjectId}`
+  const url = `https://api.voiceflow.com/v2/transcripts/${voiceflowProjectId}?startDate=${formatDate(
+    startDate
+  )}&endDate=${formatDate(endDate)}`
 
   try {
     logger.api('Attempting Voiceflow API request', { url })

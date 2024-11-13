@@ -18,51 +18,51 @@ export type TranscriptAnalysis = {
 
 function extractMessages(turns: VoiceflowTurn[]): string[] {
   const messages = turns
-  .filter((turn) => turn.type === 'text' || turn.type === 'request')
-  .map((turn) => {
-    try {
-      const payload = turn.payload;
+    .filter((turn) => turn.type === 'text' || turn.type === 'request')
+    .map((turn) => {
+      try {
+        const payload = turn.payload
 
-      // For text type (AI responses)
-      if (turn.type === 'text' && payload.payload?.slate?.content) {
-        return payload.payload.slate.content
-          .map((block) =>
-            block.children
-              .map((child) => {
-                if (child.type === 'link' && child.children?.[0]) {
-                  return child.children[0].text;
-                }
-                return child.text || '';
-              })
-              .join('')
-          )
-          .join('\n')
-          .trim();
+        // For text type (AI responses)
+        if (turn.type === 'text' && payload.payload?.slate?.content) {
+          return payload.payload.slate.content
+            .map((block) =>
+              block.children
+                .map((child) => {
+                  if (child.type === 'link' && child.children?.[0]) {
+                    return child.children[0].text
+                  }
+                  return child.text || ''
+                })
+                .join('')
+            )
+            .join('\n')
+            .trim()
+        }
+
+        // For request type (user messages)
+        if (turn.type === 'request' && payload.payload) {
+          if (payload.payload.query) return payload.payload.query
+          if (payload.payload.label) return payload.payload.label
+          if (payload.type === 'launch') return 'Conversation started'
+        }
+
+        // Fallback checks
+        if (typeof payload.message === 'string') return payload.message
+        if (typeof payload.text === 'string') return payload.text
+        if (payload.data?.message) return payload.data.message
+        if (payload.data?.text) return payload.data.text
+
+        return ''
+      } catch (error) {
+        logger.error('Error extracting message from turn', error)
+        return ''
       }
+    })
+    .filter((message) => message.length > 0)
 
-      // For request type (user messages)
-      if (turn.type === 'request' && payload.payload) {
-        if (payload.payload.query) return payload.payload.query;
-        if (payload.payload.label) return payload.payload.label;
-        if (payload.type === 'launch') return 'Conversation started';
-      }
-
-      // Fallback checks
-      if (typeof payload.message === 'string') return payload.message;
-      if (typeof payload.text === 'string') return payload.text;
-      if (payload.data?.message) return payload.data.message;
-      if (payload.data?.text) return payload.data.text;
-
-      return '';
-    } catch (error) {
-      logger.error('Error extracting message from turn', error);
-      return '';
-    }
-  })
-  .filter((message) => message.length > 0);
-
-logger.api('Extracted messages', { count: messages.length });
-return messages;
+  logger.api('Extracted messages', { count: messages.length })
+  return messages
 }
 
 export async function analyzeTranscript(
@@ -84,7 +84,7 @@ export async function analyzeTranscript(
   }
 
   const prompt = `Analyze the following conversation and provide:
-1. The primary language used (return just the ISO 639-1 code, e.g., 'en' for English)
+1. The primary language used by the user to communicate (return just the ISO 639-1 code, e.g., 'en' for English). This is NOT about their language of interest, but the language they communicat in. So for example "I want to learn German" should be classified as 'en'"
 2. A topic summary in both English and German, each in the format: "[relevant emoji] 3-5 word description"
    For example:
    English: "🚗 car maintenance discussion"
