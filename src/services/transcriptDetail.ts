@@ -42,18 +42,28 @@ export async function getTranscriptContent(
           return []
         }
 
-        // Sort turns by startTime to ensure correct order
-        const sortedTurns = response.data.sort(
-          (a, b) =>
-            new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-        )
+        // Enhanced sorting logic to match saveTranscriptTurns
+        const enhancedTurns = response.data.map((turn, index) => ({
+          ...turn,
+          sequence: index,
+        }))
+
+        const sortedTurns = enhancedTurns.sort((a, b) => {
+          const timeA = new Date(a.startTime).getTime()
+          const timeB = new Date(b.startTime).getTime()
+          if (timeA !== timeB) return timeA - timeB
+          if (a.type === 'request' && b.type === 'text') return -1
+          if (a.type === 'text' && b.type === 'request') return 1
+          return a.sequence - b.sequence
+        })
 
         logger.prisma('Fetched transcript content', {
           transcriptId,
           turnsCount: sortedTurns.length,
         })
 
-        return sortedTurns
+        // Remove the sequence before returning
+        return sortedTurns.map(({ sequence, ...turn }) => turn)
       } catch (error) {
         if (axios.isAxiosError(error)) {
           logger.error('Transcript content fetch failed', {
@@ -84,74 +94,62 @@ export async function saveTranscriptTurns(
   transcriptId: number,
   turns: VoiceflowTurn[]
 ) {
-  // Sort turns by startTime first
-  const sortedTurns = [...turns].sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-  )
+  // Sort and enhance turns with sequence numbers
+  const enhancedTurns = turns.map((turn, index) => ({
+    ...turn,
+    sequence: index,
+  }))
 
-  // Calculate metrics first (this doesn't need to be in the transaction)
+  const sortedTurns = enhancedTurns.sort((a, b) => {
+    const timeA = new Date(a.startTime).getTime()
+    const timeB = new Date(b.startTime).getTime()
+    if (timeA !== timeB) return timeA - timeB
+    if (a.type === 'request' && b.type === 'text') return -1
+    if (a.type === 'text' && b.type === 'request') return 1
+    return a.sequence - b.sequence
+  })
+
   const metrics = calculateTranscriptMetrics(sortedTurns)
 
   try {
-    // Get OpenAI analysis outside the transaction
     const analysis = await analyzeTranscript(sortedTurns)
 
-    // First transaction: Update transcript metadata
-    await prisma.$transaction(
-      async (tx) => {
-        await tx.transcript.update({
-          where: { id: transcriptId },
-          data: {
-            messageCount: metrics.messageCount,
-            firstResponse: metrics.firstResponse,
-            lastResponse: metrics.lastResponse,
-            duration: metrics.duration,
-            isComplete: metrics.isComplete,
-            language: analysis.language,
-            topic: analysis.topic,
-            topicTranslations: analysis.topicTranslations,
-            name: analysis.name,
-          },
-        })
-      },
-      {
-        timeout: 5000, // Short timeout for metadata update
-      }
-    )
+    await prisma.$transaction(async (tx) => {
+      await tx.transcript.update({
+        where: { id: transcriptId },
+        data: {
+          messageCount: metrics.messageCount,
+          firstResponse: metrics.firstResponse,
+          lastResponse: metrics.lastResponse,
+          duration: metrics.duration,
+          isComplete: metrics.isComplete,
+          language: analysis.language,
+          topic: analysis.topic,
+          topicTranslations: analysis.topicTranslations,
+          name: analysis.name,
+        },
+      })
 
-    // Second transaction: Handle turns
-    await prisma.$transaction(
-      async (tx) => {
-        // Delete existing turns
-        await tx.turn.deleteMany({
-          where: { transcriptId },
-        })
+      await tx.turn.deleteMany({
+        where: { transcriptId },
+      })
 
-        // Prepare all turn data
-        const turnData = sortedTurns.map((turn) => ({
+      await tx.turn.createMany({
+        data: sortedTurns.map((turn) => ({
           transcriptId,
           type: turn.type,
           payload: turn.payload as Prisma.InputJsonValue,
           startTime: new Date(turn.startTime),
           format: turn.format,
           voiceflowTurnId: turn.turnID,
-        }))
+          sequence: turn.sequence ?? 0,
+        })),
+      })
+    })
 
-        // Use createMany for better performance
-        await tx.turn.createMany({
-          data: turnData,
-        })
-      },
-      {
-        timeout: 10000, // Reasonable timeout for bulk operations
-      }
-    )
-
-    logger.prisma('Saved transcript with analysis and turns', {
+    logger.prisma('Saved transcript with sequences', {
       transcriptId,
       turnCount: turns.length,
-      metrics,
-      analysis,
     })
   } catch (error) {
     logger.error('Error saving transcript turns', error)

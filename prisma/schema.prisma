@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,30 +9,30 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  role      Role     @default(MEMBER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  clerkId   String   @unique
+  email     String    @unique
+  role      Role      @default(MEMBER)
+  createdAt DateTime? @default(now())
+  updatedAt DateTime  @updatedAt
+  clerkId   String    @unique
+  id        Int       @id @default(autoincrement())
   projectId Int?
-  project   Project? @relation(fields: [projectId], references: [id])
+  project   Project?  @relation(fields: [projectId], references: [id])
 
   @@index([projectId])
 }
 
 model Project {
-  id                   Int             @id @default(autoincrement())
   name                 String          @unique
-  slug                 String          @unique
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   voiceflowApiKey      String
   voiceflowProjectId   String
+  id                   Int             @id @default(autoincrement())
   lastTranscriptNumber Int             @default(0)
+  slug                 String          @unique
+  knowledgeBases       KnowledgeBase[]
   transcripts          Transcript[]
   users                User[]
-  knowledgeBases       KnowledgeBase[]
 }
 
 model Transcript {
@@ -46,8 +44,6 @@ model Transcript {
   reportTags            String[]  @default([])
   language              String?
   outcome               String?
-  topic                 String?
-  topicTranslations     Json?  // NEWLY ADDED
   messageCount          Int       @default(0)
   bookmarked            Boolean   @default(false)
   metadata              Json?
@@ -60,6 +56,8 @@ model Transcript {
   voiceflowTranscriptId String
   projectId             Int
   transcriptNumber      Int
+  topic                 String?
+  topicTranslations     Json?
   sessions              Session[]
   project               Project   @relation(fields: [projectId], references: [id])
   turns                 Turn[]
@@ -94,25 +92,21 @@ model Turn {
   startTime       DateTime
   format          String
   voiceflowTurnId String
+  sequence        Int?
   transcript      Transcript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
 
   @@index([transcriptId])
   @@index([voiceflowTurnId])
 }
 
-enum Role {
-  ADMIN
-  MEMBER
-}
-
 model KnowledgeBase {
   id        Int              @id @default(autoincrement())
-  name      String // e.g., "FAQs"
+  name      String
   projectId Int
-  project   Project          @relation(fields: [projectId], references: [id])
-  entries   KnowledgeEntry[]
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
+  project   Project          @relation(fields: [projectId], references: [id])
+  entries   KnowledgeEntry[]
 
   @@unique([projectId, name])
   @@index([projectId])
@@ -121,12 +115,17 @@ model KnowledgeBase {
 model KnowledgeEntry {
   id              Int           @id @default(autoincrement())
   question        String
-  answer          String        @db.Text
+  answer          String
   tags            String[]      @default([])
   knowledgeBaseId Int
-  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id])
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id])
 
   @@index([knowledgeBaseId])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
 }
