@@ -31,10 +31,10 @@ export async function getTranscripts(
     return date.toISOString().split('T')[0]
   }
 
-  const url = `https://api.voiceflow.com/v2/transcripts/${voiceflowProjectId}`
-  // const url = `https://api.voiceflow.com/v2/transcripts/${voiceflowProjectId}?startDate=${formatDate(
-  //   startDate
-  // )}&endDate=${formatDate(endDate)}`
+  // const url = `https://api.voiceflow.com/v2/transcripts/${voiceflowProjectId}`
+  const url = `https://api.voiceflow.com/v2/transcripts/${voiceflowProjectId}?startDate=${formatDate(
+    startDate
+  )}&endDate=${formatDate(endDate)}`
 
   try {
     logger.api('Attempting Voiceflow API request', { url })
