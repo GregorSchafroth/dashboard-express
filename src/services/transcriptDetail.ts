@@ -1,10 +1,10 @@
 // src/services/transcriptDetail.ts
-import logger from '../utils/logger.js';
-import { withRetry } from '../utils/retry.js';
-import prisma from '../lib/prisma.js';
-import type { Prisma } from '@prisma/client';
-import axios from 'axios';
-import { analyzeTranscript } from './openai.js';
+import logger from '../utils/logger.js'
+import { withRetry } from '../utils/retry.js'
+import prisma from '../lib/prisma.js'
+import type { Prisma } from '@prisma/client'
+import axios from 'axios'
+import { analyzeTranscript } from './openai.js'
 
 export type VoiceflowTurn = {
   turnID: string
@@ -41,12 +41,18 @@ export async function getTranscriptContent(
           return []
         }
 
+        // Sort turns by startTime to ensure correct order
+        const sortedTurns = response.data.sort(
+          (a, b) =>
+            new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        )
+
         logger.prisma('Fetched transcript content', {
           transcriptId,
-          turnsCount: response.data.length,
+          turnsCount: sortedTurns.length,
         })
 
-        return response.data
+        return sortedTurns
       } catch (error) {
         if (axios.isAxiosError(error)) {
           logger.error('Transcript content fetch failed', {
@@ -65,11 +71,15 @@ export async function getTranscriptContent(
 }
 
 function calculateTranscriptMetrics(turns: VoiceflowTurn[]) {
-  const messageCount = turns.filter(
+  const sortedTurns = [...turns].sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  )
+
+  const messageCount = sortedTurns.filter(
     (turn) => turn.type === 'text' || turn.type === 'request'
   ).length
 
-  const timestamps = turns.map((turn) => new Date(turn.startTime))
+  const timestamps = sortedTurns.map((turn) => new Date(turn.startTime))
   const firstResponse =
     timestamps.length > 0
       ? new Date(Math.min(...timestamps.map((date) => date.getTime())))
@@ -84,7 +94,7 @@ function calculateTranscriptMetrics(turns: VoiceflowTurn[]) {
       ? Math.round((lastResponse.getTime() - firstResponse.getTime()) / 1000)
       : null
 
-  const lastTurn = turns[turns.length - 1]
+  const lastTurn = sortedTurns[turns.length - 1]
   const isComplete =
     lastTurn?.type === 'choice' ||
     (lastTurn?.type === 'text' &&
@@ -107,50 +117,76 @@ export async function saveTranscriptTurns(
   transcriptId: number,
   turns: VoiceflowTurn[]
 ) {
-  const metrics = calculateTranscriptMetrics(turns);
-  
+  const metrics = calculateTranscriptMetrics(turns)
+
   // Get OpenAI analysis
-  const analysis = await analyzeTranscript(turns);
+  const analysis = await analyzeTranscript(turns)
 
-  await prisma.$transaction(async (tx) => {
-    // Update transcript with metrics and analysis
-    await tx.transcript.update({
-      where: { id: transcriptId },
-      data: {
-        messageCount: metrics.messageCount,
-        firstResponse: metrics.firstResponse,
-        lastResponse: metrics.lastResponse,
-        duration: metrics.duration,
-        isComplete: metrics.isComplete,
-        language: analysis.language,
-        topic: analysis.topic,
-        topicTranslations: analysis.topicTranslations,
-        name: analysis.name,
-      },
-    });
+  await prisma.$transaction(
+    async (tx) => {
+      // Update transcript with metrics and analysis
+      await tx.transcript.update({
+        where: { id: transcriptId },
+        data: {
+          messageCount: metrics.messageCount,
+          firstResponse: metrics.firstResponse,
+          lastResponse: metrics.lastResponse,
+          duration: metrics.duration,
+          isComplete: metrics.isComplete,
+          language: analysis.language,
+          topic: analysis.topic,
+          topicTranslations: analysis.topicTranslations,
+          name: analysis.name,
+        },
+      })
 
-    // Create turns
-    const turnData = turns.map((turn) => ({
-      transcriptId,
-      type: turn.type,
-      payload: turn.payload as Prisma.InputJsonValue,
-      startTime: new Date(turn.startTime),
-      format: turn.format,
-      voiceflowTurnId: turn.turnID,
-    }));
+      // First, delete any existing turns to prevent duplicates
+      await tx.turn.deleteMany({
+        where: { transcriptId },
+      })
 
-    await tx.turn.createMany({
-      data: turnData,
-      skipDuplicates: true,
-    });
-  }, {
-    timeout: 15000 // Increased timeout to account for OpenAI analysis
-  });
+      // Create turns with explicit ordering
+      for (let i = 0; i < turns.length; i++) {
+        const turn = turns[i]
+        await tx.turn.create({
+          data: {
+            transcriptId,
+            type: turn.type,
+            payload: turn.payload as Prisma.InputJsonValue,
+            startTime: new Date(turn.startTime),
+            format: turn.format,
+            voiceflowTurnId: turn.turnID,
+          },
+        })
+      } // First, delete any existing turns to prevent duplicates
+      await tx.turn.deleteMany({
+        where: { transcriptId },
+      })
+
+      // Create turns with explicit ordering
+      for (let i = 0; i < turns.length; i++) {
+        const turn = turns[i]
+        await tx.turn.create({
+          data: {
+            transcriptId,
+            type: turn.type,
+            payload: turn.payload as Prisma.InputJsonValue,
+            startTime: new Date(turn.startTime),
+            format: turn.format,
+            voiceflowTurnId: turn.turnID,
+          },
+        })
+      }
+    },
+    {
+      timeout: 30000, // Increased timeout to account for OpenAI analysis
+    }
+  )
 
   logger.prisma('Saved transcript with analysis and turns', {
     transcriptId,
     turnCount: turns.length,
     metrics,
     analysis,
-  });
+  })
 }
