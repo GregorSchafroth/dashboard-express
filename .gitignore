@@ -5,3 +5,4 @@ dist
 *.log
 scripts/
 commands.md
+.DS_Store
